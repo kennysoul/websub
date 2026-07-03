@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSub - 在线字幕编辑器</title>
+  <meta name="description" content="在线字幕编辑器，支持 ASS/SSA/VTT/SUB 格式转换为 SRT，删除特效标签，编辑对白，调整时间轴">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header id="app-header">
+    <div class="header-content">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+          <path d="M8 22h16M8 17h12M8 12h16" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+        </svg>
+        <h1>WebSub</h1>
+      </div>
+      <p class="tagline">在线字幕编辑器</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- Drop Zone -->
+    <div id="drop-zone">
+      <div class="drop-content">
+        <div class="drop-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <path d="M24 4v28m0 0l-10-10m10 10l10-10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 34v6a4 4 0 004 4h28a4 4 0 004-4v-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="drop-title">拖放字幕文件到这里</p>
+        <p class="drop-hint">支持 SRT · ASS · SSA · VTT · SUB(MicroDVD) 格式</p>
+        <button id="file-btn" class="btn btn-primary">选择文件</button>
+        <input type="file" id="file-input" accept=".srt,.ass,.ssa,.vtt,.sub" hidden>
+      </div>
+    </div>
+
+    <!-- Editor -->
+    <div id="editor" class="hidden">
+      <div class="toolbar glass">
+        <div class="toolbar-left">
+          <div class="filename-group">
+            <input type="text" id="filename-input" class="filename-input" spellcheck="false">
+            <div class="suffix-dropdown">
+              <button id="suffix-btn" class="btn btn-ghost btn-sm suffix-btn" title="添加语言后缀">Lang ▾</button>
+              <div id="suffix-menu" class="suffix-menu hidden">
+                <button data-suffix="">无后缀（默认）</button>
+                <button data-suffix=".Cantonese">. Cantonese</button>
+                <button data-suffix=".CHS">. CHS</button>
+                <button data-suffix=".CHT">. CHT</button>
+              </div>
+            </div>
+          </div>
+          <span id="sub-count" class="sub-count"></span>
+          <button id="import-another-btn" class="btn btn-ghost btn-sm" title="导入新文件">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            导入
+          </button>
+          <button id="undo-btn" class="btn btn-ghost btn-sm" title="撤销 (Ctrl+Z)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+            撤销
+          </button>
+          <button id="redo-btn" class="btn btn-ghost btn-sm" title="重做 (Ctrl+Y)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+            重做
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <button id="remove-tags-btn" class="btn btn-warning">删除特效标签</button>
+          <button id="timeline-btn" class="btn btn-ghost">时间轴调整</button>
+          <button id="export-btn" class="btn btn-primary">导出 SRT ↓</button>
+        </div>
+      </div>
+
+      <div class="selection-hint glass">
+        <span>💡 右键菜单可插入/删除字幕 · 点击选中行 · Ctrl+点击多选 · Shift+点击范围选 · Ctrl+A 全选</span>
+      </div>
+
+      <div class="table-container glass">
+        <table id="subtitle-table">
+          <thead>
+            <tr>
+              <th class="col-index">#</th>
+              <th class="col-time">开始时间</th>
+              <th class="col-time">结束时间</th>
+              <th class="col-text">内容</th>
+            </tr>
+          </thead>
+          <tbody id="subtitle-body"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state hidden">
+          <p>暂无字幕条目 · 右键可添加</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="context-menu hidden">
+    <button id="ctx-insert-above">↑ 在上方插入字幕</button>
+    <button id="ctx-insert-below">↓ 在下方插入字幕</button>
+    <div class="ctx-divider"></div>
+    <button id="ctx-select-all">全选 (Ctrl+A)</button>
+    <div class="ctx-divider"></div>
+    <button id="ctx-delete" class="ctx-danger">删除所选 (<span id="ctx-delete-count">0</span> 条)</button>
+  </div>
+
+  <!-- Timeline Modal -->
+  <div id="timeline-modal" class="modal-overlay hidden">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h2>时间轴调整</h2>
+        <button class="modal-close" data-modal="timeline-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>应用范围</label>
+          <div class="scope-options">
+            <label class="scope-option"><input type="radio" name="scope" value="all" checked> <span>全部字幕</span></label>
+            <label class="scope-option"><input type="radio" name="scope" value="selected"> <span>仅所选 (<span id="scope-sel-count">0</span> 条)</span></label>
+            <label class="scope-option"><input type="radio" name="scope" value="before"> <span>所选及之前</span></label>
+            <label class="scope-option"><input type="radio" name="scope" value="after"> <span>所选及之后</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="offset-input">整体偏移 (毫秒)</label>
+          <div class="input-row">
+            <button class="btn btn-ghost btn-sm" id="offset-minus">-100</button>
+            <input type="number" id="offset-input" value="0" step="100" placeholder="正数延后，负数提前">
+            <button class="btn btn-ghost btn-sm" id="offset-plus">+100</button>
+          </div>
+          <p class="form-hint">正数 = 字幕延后，负数 = 字幕提前</p>
+        </div>
+        <div class="form-group">
+          <label for="scale-input">速度缩放倍率</label>
+          <input type="number" id="scale-input" value="1.0" step="0.01" min="0.1" max="10" placeholder="1.0 = 不变">
+          <p class="form-hint">大于 1 = 放慢，小于 1 = 加快</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-modal="timeline-modal">取消</button>
+        <button class="btn btn-primary" id="apply-timeline">应用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inline Add Row Modal -->
+  <div id="add-modal" class="modal-overlay hidden">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h2 id="add-modal-title">插入字幕</h2>
+        <button class="modal-close" data-modal="add-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="add-start">开始时间</label>
+            <input type="text" id="add-start" placeholder="00:00:00,000">
+          </div>
+          <div class="form-group">
+            <label for="add-end">结束时间</label>
+            <input type="text" id="add-end" placeholder="00:00:00,000">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="add-text">内容</label>
+          <textarea id="add-text" rows="3" placeholder="输入字幕内容"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-modal="add-modal">取消</button>
+        <button class="btn btn-primary" id="apply-add">插入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
