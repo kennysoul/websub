@@ -42,7 +42,17 @@ function handleFile(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      subtitles = parseSubtitle(e.target.result, ext);
+      const buffer = e.target.result;
+      const uint8Array = new Uint8Array(buffer);
+      
+      let text = new TextDecoder('utf-8').decode(uint8Array);
+      
+      // 检测到乱码替换符，尝试使用 GBK 重新解码（常见于中文字幕）
+      if (text.includes('')) {
+        text = new TextDecoder('gbk').decode(uint8Array);
+      }
+
+      subtitles = parseSubtitle(text, ext);
       selectedIndices.clear();
       lastClickedIndex = -1;
       undoStack = [];
@@ -52,7 +62,7 @@ function handleFile(file) {
       showToast(`已导入 ${subtitles.length} 条字幕`);
     } catch (err) { showToast('解析失败: ' + err.message, true); }
   };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
 }
 
 function showEditor() {
