@@ -271,7 +271,14 @@ function stripTags(text) {
   text = text.replace(/\{[^}]*\}/g, '');
   // Remove HTML tags <...>
   text = text.replace(/<[^>]+>/g, '');
-  return text.trim();
+  text = text.trim();
+  
+  // If text only contains drawing coordinates (numbers, dots, spaces, m, l, |, c, b, s), it's a drawing block
+  if (/^[\d\s.|mlcbn]+$/.test(text) && text.length > 20) {
+    return '';
+  }
+  
+  return text;
 }
 
 // ===== Render Table =====
