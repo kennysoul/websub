@@ -21,6 +21,54 @@ const emptyState = $('#empty-state');
 const contextMenu = $('#context-menu');
 const toast = $('#toast');
 
+// ===== Encoding Detection =====
+function detectEncoding(uint8Array) {
+  if (uint8Array.length < 2) return 'utf-8';
+  // UTF-8 BOM
+  if (uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) return 'utf-8';
+  // UTF-16 BE BOM
+  if (uint8Array[0] === 0xFE && uint8Array[1] === 0xFF) return 'utf-16be';
+  // UTF-16 LE BOM
+  if (uint8Array[0] === 0xFF && uint8Array[1] === 0xFE) return 'utf-16le';
+  return null;
+}
+
+function isLikelyValidChineseText(text) {
+  if (!text || text.length === 0) return false;
+  const cjkRegex = /[\u4e00-\u9fff\u3400-\u4dbf]/;
+  const hasCJK = cjkRegex.test(text);
+  if (!hasCJK) return true;
+  const replacementCount = (text.match(/\uFFFD/g) || []).length;
+  const invalidControl = (text.match(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g) || []).length;
+  const totalLen = text.length;
+  return replacementCount / totalLen < 0.01 && invalidControl / totalLen < 0.01;
+}
+
+function decodeText(uint8Array) {
+  const bomEncoding = detectEncoding(uint8Array);
+  if (bomEncoding === 'utf-16be') {
+    return new TextDecoder('utf-16be').decode(uint8Array.slice(2));
+  }
+  if (bomEncoding === 'utf-16le') {
+    return new TextDecoder('utf-16le').decode(uint8Array.slice(2));
+  }
+
+  let text = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
+  if (isLikelyValidChineseText(text)) return text;
+
+  try {
+    const gbkText = new TextDecoder('gbk').decode(uint8Array);
+    if (isLikelyValidChineseText(gbkText)) return gbkText;
+  } catch (e) { /* GBK not supported */ }
+
+  try {
+    const big5Text = new TextDecoder('big5').decode(uint8Array);
+    if (isLikelyValidChineseText(big5Text)) return big5Text;
+  } catch (e) { /* Big5 not supported */ }
+
+  return text;
+}
+
 // ===== File Import =====
 dropZone.addEventListener('click', () => fileInput.click());
 $('#file-btn').addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
@@ -42,16 +90,8 @@ function handleFile(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const buffer = e.target.result;
-      const uint8Array = new Uint8Array(buffer);
-      
-      let text = new TextDecoder('utf-8').decode(uint8Array);
-      
-      // 检测到乱码替换符，尝试使用 GBK 重新解码（常见于中文字幕）
-      if (text.includes('')) {
-        text = new TextDecoder('gbk').decode(uint8Array);
-      }
-
+      const uint8Array = new Uint8Array(e.target.result);
+      const text = decodeText(uint8Array);
       subtitles = parseSubtitle(text, ext);
       selectedIndices.clear();
       lastClickedIndex = -1;
