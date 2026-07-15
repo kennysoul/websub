@@ -263,7 +263,15 @@ function pad3(n) { return String(n).padStart(3, '0'); }
 
 // ===== Tag Removal =====
 function stripTags(text) {
-  return text.replace(/\{[^}]*\}/g, '').replace(/<[^>]+>/g, '').trim();
+  // Remove ASS drawing blocks: {\pN}...{\p0} or inline drawing tags
+  text = text.replace(/\{\\p\d+[^}]*\}[\s\S]*?\{\\p0[^}]*\}/g, '');
+  // Remove inline drawing tags {\...\pN...}
+  text = text.replace(/\{[^}]*\\p\d+[^}]*\}/g, '');
+  // Remove regular ASS tags {...}
+  text = text.replace(/\{[^}]*\}/g, '');
+  // Remove HTML tags <...>
+  text = text.replace(/<[^>]+>/g, '');
+  return text.trim();
 }
 
 // ===== Render Table =====
