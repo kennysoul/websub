@@ -188,7 +188,7 @@ function parseASS(text) {
     result.push({
       startTime: assTimeToMs(fields[si].trim()),
       endTime: assTimeToMs(fields[ei].trim()),
-      text: (fields[ti] || '').replace(/\\N/gi, '\n').replace(/\\n/gi, '\n'),
+      text: stripTags((fields[ti] || '').replace(/\\N/gi, '\n').replace(/\\n/gi, '\n')),
     });
   }
   return result;
